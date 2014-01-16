@@ -8,6 +8,8 @@ PLUGIN_TITLE		= "Illico Web"
 PLUGIN_PREFIX   	= "/video/illicoweb"
 BASE_URL = "http://illicoweb.videotron.com/"
 API_URL = "https://illicoweb.videotron.com/illicoservice/"
+LOGO_URL = 'https://static-illicoweb.videotron.com/illicoweb/static/webtv/images/logos/'
+DEFAULT_ART_URL = 'http://static-illicoweb.videotron.com/illicoweb/static/webtv/images/content/custom/presse1.jpg'
 LOGGEDIN                                        = False
 sessionid                                        = ''
 
@@ -25,17 +27,17 @@ def ValidatePrefs():
         u = Prefs['username']
         p = Prefs['password']
         if( u and p ):
-                LOGGEDIN = Login()
-                if LOGGEDIN == False:
-                        return MessageContainer(
-                                "Erreur",
-                                "Accès refusé"
-                        )
-        else:
-                return MessageContainer(
-                        "Erreur",
-                        "Entrez votre nom d'utilisateur et votre mot de passe"
-                )
+			LOGGEDIN = Login()
+			if LOGGEDIN == False:
+				return MessageContainer(
+					"Erreur",
+					"Accès refusé"
+				)
+		else:
+			return MessageContainer(
+				"Erreur",
+				"Entrez votre nom d'utilisateur et votre mot de passe"
+			)
 
 
 
@@ -67,7 +69,7 @@ def MainMenu():
 	url=API_URL +'channels/user?localeLang=fr'
 	obj=JSON.ObjectFromURL(url)
 	
-	if obj['head']['clubIllicoStatus'] == "NOT_CONNECTED"
+	if obj['head']['clubIllicoStatus'] == "NOT_CONNECTED":
 		LOGGEDIN = Login()
 		Log(" --> FROM MAIN1! %s SSID='%s'" % (LOGGEDIN,httpCookies))
 	else 
@@ -76,7 +78,7 @@ def MainMenu():
 	Log(" --> FROM MAIN! %s SSID='%s'" % (LOGGEDIN,sessionid))
 	
 	if LOGGEDIN == True:
-		oc.add(DirectoryObject(key=Callback(BrowseChannels), title="Canaux Télé"))
+		oc.add(DirectoryObject(key=Callback(BrowseChannels), title="Chaines T�l�"))
 
     oc.add(PrefsObject(title = 'Login'))
 	
@@ -85,7 +87,36 @@ def MainMenu():
 ####################################################################################################
 
 def BrowseChannels():
+	oc = ObjectContainer(title2 = "Chaines")
 	
+	url = API_URL+'channels/user?localeLang=fr'
+	obj = JSON.ObjectFromURL(url)
+	channels = obj['body']['main']
+	
+	for channel in channels:
+		title = channel['name']
+		try:
+			thumb = LOGO_URL + channel['image']
+		except:
+			thumb = None
+			art = DEFAULT_ART_URL
+		oc.add(DirectoryObject(key=Callback(Channel, channel=channel), title = title, thumb = thumb, art = art ))
+		
+####################################################################################################
+
+def Channel(channel):
+	url = channel['link']['uri']
+	obj = JSON.ObjectFromURL(API_URL+url)
+	sections = obj['body']['main']['sections']
+	
+	onDemand = False
+        for i in sections:
+            if 'widgetType' in i:
+                if i['widgetType'] == 'MENU':
+                    onDemand = True
+                    url = i['contentDownloadURL']
+        if (onDemand == False):
+            
 
 ####################################################################################################
 
@@ -97,33 +128,33 @@ def TranslateDate(date):
 ####################################################################################################
 
 def Login():
-        global LOGGEDIN, sessionid
-        if LOGGEDIN == True:
-                return True
-        elif not Prefs['username'] and not Prefs['password']:
-            return False
-        else:
-			#initiate = HTTP.Request(BASE_URL+'/login/', encoding='iso-8859-1', cacheTime=1)
-			values = {
-					'username' : Prefs['username'],
-					'password' : Prefs['password']
-			}
-			url = API_URL+'authenticate?localLang=fr&password='+Prefs['password']+'&userId='+Prefs['username']'     
-				 
-			try:
-					obj = JSON.ObjectFromURL(url, values=values, encoding='utf-8', cacheTime=1)
-			except:
-					obj=[]
-					Log("----> Someting Bad'%s'" % (values))
-					LOGGEDIN = False
-					return False        
-		   
-			if len(obj['body']['main']['sessionId']) > 0:
-					sessionid = obj['body']['main']['sessionId']
-					LOGGEDIN = True
-					Log(" --> Login successful! %s SSID='%s'" % (LOGGEDIN,sessionid))
-					return True
-			else:
-					LOGGEDIN = False
-					Log(' --> Username/password incorrect!')
-					return False
+	global LOGGEDIN, sessionid
+	if LOGGEDIN == True:
+		return True
+	elif not Prefs['username'] and not Prefs['password']:
+		return False
+	else:
+		#initiate = HTTP.Request(BASE_URL+'/login/', encoding='iso-8859-1', cacheTime=1)
+		values = {
+			'username' : Prefs['username'],
+			'password' : Prefs['password']
+		}
+		url = API_URL+'authenticate?localLang=fr&password='+Prefs['password']+'&userId='+Prefs['username']'     
+			 
+		try:
+			obj = JSON.ObjectFromURL(url, values=values, encoding='utf-8', cacheTime=1)
+		except:
+			obj=[]
+			Log("----> Someting Bad'%s'" % (values))
+			LOGGEDIN = False
+			return False        
+   
+		if len(obj['body']['main']['sessionId']) > 0:
+			sessionid = obj['body']['main']['sessionId']
+			LOGGEDIN = True
+			Log(" --> Login successful! %s SSID='%s'" % (LOGGEDIN,sessionid))
+			return True
+		else:
+			LOGGEDIN = False
+			Log(' --> Username/password incorrect!')
+			return False
