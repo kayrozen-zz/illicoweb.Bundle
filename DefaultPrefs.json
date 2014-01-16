@@ -1,0 +1,16 @@
+[
+    {
+        "id": "username",
+        "type": "text",
+        "label": "Utilisateur",
+        "default": ""
+    },
+    {
+        "id": "password",
+        "type": "text",
+        "label": "Mot de passe",
+        "default": "",
+        "option": "hidden",
+        "secure": "true",
+    }
+]
