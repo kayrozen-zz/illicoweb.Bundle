@@ -1,14 +1,14 @@
 # -*- coding: latin-1 -*-
 
-#Regex
-RE_EP_NUM         = Regex('Ã‰pisode ([0-9]+)')
+ICON  = 'icon-default.png'
 
 # Plugin parameters
 PLUGIN_TITLE		= "Illico Web"
 PLUGIN_PREFIX   	= "/video/illicoweb"
 BASE_URL = "http://illicoweb.videotron.com/"
 API_URL = "https://illicoweb.videotron.com/illicoservice/"
-LOGO_URL = 'https://static-illicoweb.videotron.com/illicoweb/static/webtv/images/logos/'
+LOGO_URL = 'http://static-illicoweb.videotron.com/illicoweb/static/webtv/images/logos/'
+ART_URL = "http://static-illicoweb.videotron.com/illicoweb/static/webtv/images/content/custom/"
 DEFAULT_ART_URL = 'http://static-illicoweb.videotron.com/illicoweb/static/webtv/images/content/custom/presse1.jpg'
 LOGGEDIN                                        = False
 sessionid                                        = ''
@@ -31,7 +31,7 @@ def ValidatePrefs():
 			if LOGGEDIN == False:
 				return MessageContainer(
 					"Erreur",
-					"AccÃ¨s refusÃ©"
+					"Accès refusé"
 				)
 		else:
 			return MessageContainer(
@@ -49,6 +49,7 @@ def Start():
 	
 	# Set the default ObjectContainer attributes
 	ObjectContainer.title1    = PLUGIN_TITLE
+	DirectoryObject.thumb = R(ICON)
 
 	# Set the default cache time
 	HTTP.CacheTime = 1800
@@ -78,45 +79,63 @@ def MainMenu():
 	Log(" --> FROM MAIN! %s SSID='%s'" % (LOGGEDIN,sessionid))
 	
 	if LOGGEDIN == True:
-		oc.add(DirectoryObject(key=Callback(BrowseChannels), title="Chaines Télé"))
+		urlChannels = API_URL+'channels/user?localeLang=fr'
+		objChannels = JSON.ObjectFromURL(url)
+		channels = objChannels['body']['main']
+		
+		for channel in channels:
+			title = channel['name']
+			try:
+				thumb = LOGO_URL + channel['image']
+			except:
+				thumb = None
+			art = DEFAULT_ART_URL
+			oc.add(DirectoryObject(key=Callback(Channel, channel=channel, title=title), title = title, thumb = thumb, art = art ))
+		
 
     oc.add(PrefsObject(title = 'Login'))
 	
 	return oc
 
+
 ####################################################################################################
 
-def BrowseChannels():
-	oc = ObjectContainer(title2 = "Chaines")
-	
-	url = API_URL+'channels/user?localeLang=fr'
-	obj = JSON.ObjectFromURL(url)
-	channels = obj['body']['main']
-	
-	for channel in channels:
-		title = channel['name']
-		try:
-			thumb = LOGO_URL + channel['image']
-		except:
-			thumb = None
-			art = DEFAULT_ART_URL
-		oc.add(DirectoryObject(key=Callback(Channel, channel=channel), title = title, thumb = thumb, art = art ))
-		
-####################################################################################################
-
-def Channel(channel):
-	url = channel['link']['uri']
+def Channel(channel,title):
+	oc = ObjectContainer(title2 = title)
+	url = "url?logicalUrl="+channel['link']['uri']
 	obj = JSON.ObjectFromURL(API_URL+url)
-	sections = obj['body']['main']['sections']
 	
-	onDemand = False
-        for i in sections:
-            if 'widgetType' in i:
-                if i['widgetType'] == 'MENU':
-                    onDemand = True
-                    url = i['contentDownloadURL']
-        if (onDemand == False):
-            
+	provider = obj['body']['main']['provider']
+	try:
+		thumb = LOGO_URL + provider['image']
+	except:
+		thumb = None
+	try:
+		art = ART_URL + obj['body']['main'][0]['backgroundURL']
+	except:
+		art = DEFAULT_ART_URL
+		
+		
+	sections = obj['body']['main']['sections']
+	try:
+		live = provider['orderURI']
+		
+	if live :
+		oc.add(DirectoryObject(key=Callback(liveStream, live), title = "En Direct", thumb = thumb, art = art ))
+	
+
+    for menu in sections:
+		if 'widgetType' in menu:
+			if menu['widgetType'] == 'MENU':
+				url = menu['contentDownloadURL']
+				oc.add(DirectoryObject(key=Callback(getMenu, url), title = "Toutes les émissions", thumb = thumb, art = art ))
+			if menu['widgetType'] == "BASIC"
+				url = menu['contentDownloadURL']
+				menutitle =  menu['titleLabel']['text']
+				oc.add(DirectoryObject(key=Callback(getMenu, url), title = menutitle, thumb = thumb, art = art ))
+				
+	return oc
+		
 
 ####################################################################################################
 
@@ -134,7 +153,6 @@ def Login():
 	elif not Prefs['username'] and not Prefs['password']:
 		return False
 	else:
-		#initiate = HTTP.Request(BASE_URL+'/login/', encoding='iso-8859-1', cacheTime=1)
 		values = {
 			'username' : Prefs['username'],
 			'password' : Prefs['password']
